@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Бали — бот-планировщик</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f4f0;color:#1a1a18;min-height:100vh;padding:1rem}
+.wrap{max-width:680px;margin:0 auto;padding:1rem 0}
+.bubble{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:1rem;font-size:15px;line-height:1.7;color:#1a1a18}
+.bubble p+p{margin-top:.75rem}
+.bubble a{color:#185fa5;text-decoration:none}
+.bubble a:hover{text-decoration:underline}
+.btn-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:1rem}
+.btn{background:#fff;border:0.5px solid rgba(0,0,0,.25);border-radius:8px;padding:8px 16px;font-size:14px;cursor:pointer;color:#1a1a18;transition:background .15s;font-family:inherit}
+.btn:hover{background:#f5f4f0}
+.btn-primary{background:#e6f1fb;color:#185fa5;border-color:#b5d4f4}
+.btn-primary:hover{background:#b5d4f4}
+.section-title{font-size:13px;color:#5f5e5a;margin-bottom:.5rem;font-weight:500}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin-top:1rem}
+.menu-btn{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;color:#1a1a18;text-align:left;transition:background .15s,border-color .15s;font-family:inherit}
+.menu-btn:hover{background:#f5f4f0;border-color:rgba(0,0,0,.25)}
+.menu-bar{background:#f5f4f0;border:0.5px solid rgba(0,0,0,.1);border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+.input-field{width:100%;background:#fff;border:0.5px solid rgba(0,0,0,.25);border-radius:8px;padding:8px 12px;font-size:14px;color:#1a1a18;margin-top:6px;font-family:inherit}
+.back-btn{background:none;border:none;cursor:pointer;color:#5f5e5a;font-size:13px;display:flex;align-items:center;gap:4px;padding:0;margin-bottom:1rem;font-family:inherit}
+.back-btn:hover{color:#1a1a18}
+.place-card{background:#f5f4f0;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:.75rem 1rem;margin:.5rem 0}
+.place-name{font-weight:500;font-size:14px}
+.place-link{font-size:13px;color:#185fa5;text-decoration:none}
+.place-link:hover{text-decoration:underline}
+.toast{font-size:12px;color:#0f6e56;background:#e1f5ee;border:0.5px solid #9fe1cb;border-radius:8px;padding:6px 12px;display:inline-block;margin-top:.5rem}
+strong{font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const app = document.getElementById('app');
+
+const TOPICS = [
+  {id:'district', label:'Как выбрать район?'},
+  {id:'housing', label:'Где искать жильё?'},
+  {id:'transport', label:'Как передвигаться по острову?'},
+  {id:'money', label:'Чем и как платить на острове?'},
+  {id:'visa', label:'Нужна ли виза?'},
+  {id:'yoga', label:'Где заниматься йогой?'},
+  {id:'beaches', label:'Какие пляжи посетить?'},
+  {id:'nature', label:'Какие природные красоты?'},
+  {id:'remote', label:'Где работать на удалёнке?'},
+  {id:'food', label:'Где вкусно поесть?'},
+];
+
+const REMOTE_AREAS = ['Улувату','Джимбаран','Унгасан','Нуса Дуа','Семиньяк','Чангу','Убуд'];
+const FOOD_AREAS = ['Санур','Улувату','Джимбаран','Унгасан','Нуса Дуа','Семиньяк','Чангу','Убуд','Ловина'];
+
+let state = { screen:'welcome', surveyData:{}, surveyStep:0, extra:null };
+
+function render() {
+  app.innerHTML = '';
+  const s = state.screen;
+  if (s==='welcome') renderWelcome();
+  else if (s==='survey') renderSurvey();
+  else if (s==='main') renderMain();
+  else if (s==='topic') renderTopic();
+}
+
+function div(html) { const d=document.createElement('div'); d.innerHTML=html; app.appendChild(d); }
+
+function renderWelcome() {
+  div(`
+    <div class="bubble">
+      <p>Привет! Скорее всего ты впервые собираешься на Бали и тебе нужна помощь с планированием поездки, потому что ты буквально начинаешь тонуть в том количестве информации, которую уже смог отыскать в открытом доступе. И я тебя полностью понимаю.</p>
+      <p>Меня зовут Саша, летом 2025 года я улетела на Бали и прожила там 1,5 месяца. В первые несколько недель я всеми силами пыталась въехать в местную жизнь — это было непросто. Поэтому я хочу поделиться своими наблюдениями и рекомендациями.</p>
+      <p style="font-size:13px;color:#5f5e5a">Дисклеймер №1: это бесплатно.<br>Дисклеймер №2: все ответы — письменное изложение моих мыслей и опыта жизни на Бали. Никакого ИИ.</p>
+      <p>Расскажи о своей предстоящей поездке — ответь на 5 вопросов, это займёт 30–40 секунд. Или сразу переходи к темам.</p>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="go('survey')">Пройти опрос</button>
+        <button class="btn" onclick="go('main')">Пропустить опрос</button>
+      </div>
+    </div>`);
+}
+
+function go(screen, extra) { state.screen=screen; state.extra=extra||null; render(); }
+
+function renderSurvey() {
+  const step = state.surveyStep;
+  const sd = state.surveyData;
+
+  if (step===0) {
+    div(`<div class="bubble">
+      <div class="section-title">Собираешься на Бали?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('going',true);nextStep(1)">Да</button>
+        <button class="btn" onclick="setSurvey('going',false);nextStep(10)">Нет</button>
+      </div></div>`);
+  } else if (step===10) {
+    div(`<div class="bubble">
+      <div class="section-title">Тебя пригласили протестировать функционал чат-бота?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('invited',true);finishSurvey()">Да</button>
+        <button class="btn" onclick="setSurvey('invited',false);nextStep(11)">Нет</button>
+      </div></div>`);
+  } else if (step===11) {
+    div(`<div class="bubble">
+      <div class="section-title">Расскажи, как ты попал в чат-бот?</div>
+      <div class="btn-row" style="flex-direction:column;align-items:flex-start">
+        <button class="btn" onclick="setSurvey('how','curiosity');finishSurvey()">Из любознательности</button>
+        <div>
+          <button class="btn" onclick="toggleExtra('travel_dest')">Искал помощника по планированию путешествия, но не на Бали</button>
+          <div id="extra_travel_dest" style="display:none;margin-top:6px">
+            <input class="input-field" id="dest_input" placeholder="Куда ты хотел(а) отправиться в путешествие?" style="max-width:360px">
+            <div class="btn-row"><button class="btn btn-primary" onclick="setSurvey('how','other_travel');setSurvey('dest',document.getElementById('dest_input').value);finishSurvey()">Готово</button></div>
+          </div>
+        </div>
+        <div>
+          <button class="btn" onclick="toggleExtra('other_expect')">Думал(а), что это вообще про другое</button>
+          <div id="extra_other_expect" style="display:none;margin-top:6px">
+            <input class="input-field" id="expect_input" placeholder="Какие были ожидания от чат-бота?" style="max-width:360px">
+            <div class="btn-row"><button class="btn btn-primary" onclick="setSurvey('how','wrong_bot');setSurvey('expect',document.getElementById('expect_input').value);finishSurvey()">Готово</button></div>
+          </div>
+        </div>
+      </div></div>`);
+  } else if (step===1) {
+    div(`<div class="bubble">
+      <div class="section-title">Впервые?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('first',true);nextStep(2)">Да</button>
+        <button class="btn" onclick="setSurvey('first',false);nextStep(2)">Нет</button>
+      </div></div>`);
+  } else if (step===2) {
+    div(`<div class="bubble">
+      <div class="section-title">Какова цель твоей поездки?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('goal','travel');nextStep(3)">Путешествие</button>
+        <button class="btn" onclick="setSurvey('goal','remote');nextStep(3)">Путешествие + удалённая работа / зимовка</button>
+        <button class="btn" onclick="setSurvey('goal','relocation');nextStep(3)">Релокация</button>
+      </div></div>`);
+  } else if (step===3) {
+    div(`<div class="bubble">
+      <div class="section-title">Надолго едешь на Бали?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('duration','1-2w');nextStep(4)">1–2 недели</button>
+        <button class="btn" onclick="setSurvey('duration','3-4w');nextStep(4)">3–4 недели</button>
+        <button class="btn" onclick="setSurvey('duration','1-15m');nextStep(4)">1–1,5 месяца</button>
+        <button class="btn" onclick="setSurvey('duration','open');nextStep(4)">Посмотрю по ситуации</button>
+      </div></div>`);
+  } else if (step===4) {
+    div(`<div class="bubble">
+      <div class="section-title">С кем едешь на Бали?</div>
+      <div class="btn-row">
+        <button class="btn" onclick="setSurvey('with','solo');nextStep(5)">Один / одна</button>
+        <button class="btn" onclick="setSurvey('with','couple');nextStep(5)">С парой</button>
+        <button class="btn" onclick="setSurvey('with','family');nextStep(5)">С семьёй с детьми</button>
+        <button class="btn" onclick="setSurvey('with','friends');nextStep(5)">С компанией 2+ друзей</button>
+      </div></div>`);
+  } else if (step===5) {
+    div(`<div class="bubble">
+      <p>Если ты готов(а) принять участие в интервью о том, как ты обычно планируешь путешествия, оставь свой ник в Telegram. Я свяжусь в течение 2 рабочих дней.</p>
+      <input class="input-field" id="tg_input" placeholder="@username (необязательно)" style="max-width:280px;margin-top:8px">
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="setSurvey('tg',document.getElementById('tg_input').value||'—');finishSurvey()">Продолжить</button>
+      </div></div>`);
+  }
+}
+
+window.setSurvey = (k,v) => { state.surveyData[k]=v; };
+window.nextStep = (n) => { state.surveyStep=n; render(); };
+window.toggleExtra = (id) => {
+  const el=document.getElementById('extra_'+id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+};
+window.finishSurvey = () => {
+  console.log('Mock Google Sheets save:', JSON.stringify(state.surveyData));
+  state.screen='main'; state.surveyStep=0; render();
+  setTimeout(()=>{ const t=document.createElement('div'); t.className='toast'; t.style='margin:0 0 1rem 1.5rem'; t.textContent='✓ Ответы сохранены'; app.insertBefore(t,app.firstChild); setTimeout(()=>t.remove(),3000); },100);
+};
+
+function renderMain() {
+  div(`<div class="bubble">
+    <p>Выбери тему, о которой хочешь почитать подробнее:</p>
+    <div class="menu-grid" style="margin-top:.75rem">
+      ${TOPICS.map(t=>`<button class="menu-btn" onclick="openTopic('${t.id}')">${t.label}</button>`).join('')}
+    </div></div>`);
+}
+
+window.openTopic = (id) => { state.screen='topic'; state.extra={id}; render(); };
+
+function renderTopic() {
+  const id = state.extra?.id;
+  div(`<button class="back-btn" onclick="go('main')">← Назад к темам</button>`);
+  if (id==='district') renderDistrict(state.extra?.sub);
+  else if (id==='housing') renderHousing(state.extra?.sub);
+  else if (id==='transport') renderTransport(state.extra?.sub);
+  else if (id==='money') div(moneyHTML());
+  else if (id==='visa') div(visaHTML());
+  else if (id==='yoga') div(yogaHTML());
+  else if (id==='beaches') div(beachesHTML());
+  else if (id==='nature') div(natureHTML());
+  else if (id==='remote') renderRemote(state.extra?.area);
+  else if (id==='food') renderFood(state.extra?.area);
+  renderMenuBar();
+}
+
+function renderMenuBar() {
+  div(`<div class="menu-bar">
+    <div class="section-title" style="margin-bottom:.5rem">Другие темы</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${TOPICS.map(t=>`<button class="btn" style="font-size:13px;padding:5px 10px" onclick="state.extra={id:'${t.id}'};state.screen='topic';render()">${t.label}</button>`).join('')}
+    </div></div>`);
+}
+
+function renderDistrict(sub) {
+  if (!sub) {
+    div(`<div class="bubble">
+      <div class="section-title">Что тебя интересует больше всего?</div>
+      <div class="btn-row" style="flex-direction:column;align-items:flex-start">
+        <button class="btn" onclick="state.extra={id:'district',sub:'ocean'};render()">Океан, серфинг для начинающих, спокойная обстановка</button>
+        <button class="btn" onclick="state.extra={id:'district',sub:'surf'};render()">Серфинг для продолжающих, тусовки, много русскоязычных экспатов</button>
+        <button class="btn" onclick="state.extra={id:'district',sub:'jungle'};render()">Джунгли, магия, йога</button>
+        <button class="btn" onclick="state.extra={id:'district',sub:'all'};render()">Узнать обо всех локациях на Бали</button>
+      </div></div>`);
+    return;
+  }
+  if (sub==='ocean'||sub==='all') div(`<div class="bubble">
+    <p>Если хочешь жить ближе к океану и тебе не нужны ежедневные тусовки, то это <strong>Букит</strong> — южная оконечность острова. Самый хайповый район, где живёт больше всего экспатов — <strong>Улувату</strong>. На пляжах там есть школы серфинга, волны подойдут даже для начинающих.</p>
+    <p>Я жила в <strong>Унгасане</strong> — район отличный, дешевле, чем Улувату. Поселилась в гесте <strong>Hermon House Ungasan</strong> и платила 3 000 000 рупий в месяц (~15 000 ₽). Условия базовые: кровать, шкаф, стол, душ с туалетом, общая кухня. Иногда появляются муравьишки — норма для Бали. Советую, если неприхотливы в быту.</p>
+    <p>Огромный плюс — хозяин <strong>Sigit</strong>: научил меня ездить на байке и рекомендовал классные места. Контакт: <a href="tel:+6282235354521">+62 822 3535 4521</a></p>
+  </div>`);
+  if (sub==='surf'||sub==='all') div(`<div class="bubble">
+    <p>Если тебе важна русскоязычная тусовка, бесконечные кафе, рестораны, клубы — это <strong>Чангу</strong>. Здесь живёт большинство русскоязычных экспатов на Бали. Очень много пробок, но очень социальный район, красивые закаты.</p>
+    <p>В Чангу приезжают за серфингом, но волны подходят преимущественно продолжающим. Если на доске ни разу не стояли — может быть опасно из-за волн.</p>
+  </div>`);
+  if (sub==='jungle'||sub==='all') div(`<div class="bubble">
+    <p>Джунгли, возвышенное комьюнити, йога → <strong>Убуд</strong>, духовный центр Бали. Второй по численности русскоязычного комьюнити район после Чангу.</p>
+    <p>Рекомендую гестхаус <strong>Astawa House</strong> — тихое место, ни петухов, ни стройки. 250 000 рупий за ночь (~1 200 ₽). Комфортные домики. Контакт: <a href="tel:+6281916267996">+62 819 1626 7996</a>.</p>
+  </div>`);
+  if (sub==='all') div(`<div class="bubble">
+    <p>Хочешь почиллить пару дней и поснорклить — <strong>Амед</strong> (западная оконечность). Там можно купаться, в отличие от многих мест на Бали. Для длительного проживания не подходит.</p>
+    <p><strong>Ловина</strong> — знаменита дельфинами. Очень тихо, мало людей, экспаты практически не живут. Гест <strong>Rumi Bumi Lovina</strong>: отец и дочь-хозяйка, хороший интернет, рядом 2 вкусных варунга. Контакт: <a href="tel:+6283147659233">+62 831 4765 9233</a>.</p>
+  </div>`);
+}
+
+function renderHousing(sub) {
+  if (!sub) {
+    div(`<div class="bubble">
+      <div class="section-title">Выбери, что тебя интересует:</div>
+      <div class="btn-row" style="flex-direction:column;align-items:flex-start">
+        <button class="btn" onclick="state.extra={id:'housing',sub:'types'};render()">Гестхаус и комната на вилле — основные опции</button>
+        <button class="btn" onclick="state.extra={id:'housing',sub:'laundry'};render()">Стирка (и почему она вынесена в отдельный пункт)</button>
+        <button class="btn" onclick="state.extra={id:'housing',sub:'contacts'};render()">Контакты хороших гестхаусов — личные рекомендации</button>
+        <button class="btn" onclick="state.extra={id:'housing',sub:'all'};render()">Обо всём сразу</button>
+      </div></div>`);
+    return;
+  }
+  if (sub==='types'||sub==='all') div(`<div class="bubble">
+    <p><strong>Гестхаус</strong> — как правило, дешевле всего. Комната с общей кухней на всех жильцов (может быть 10–20 человек). Иногда появляются муравьишки — для Бали это норма.</p>
+    <p>Я жила в <strong>Hermon House Ungasan</strong> — 3 000 000 рупий/мес (~15 000 ₽). Кровать, шкаф, стол, душ, туалет, общая кухня. Хозяин <strong>Sigit</strong> — невероятно гостеприимный. Контакт: <a href="tel:+6282235354521">+62 822 3535 4521</a>.</p>
+    <p><strong>Комната на вилле</strong> — второй популярный вариант. Обычно 3–4 комнаты + общая кухня. Иногда есть стиральная машина — это большой плюс.</p>
+  </div>`);
+  if (sub==='laundry'||sub==='all') div(`<div class="bubble">
+    <p>Стиральная машина в гестхаусе — редкость. Зато повсеместно есть <strong>laundry</strong>: приносишь одежду и стираешь за деньги. Одни принимают от нескольких килограммов, другие — поштучно. Я стирала только там, где принимают поштучно — удобнее.</p>
+    <p>Увидишь виллу со стиральной машиной в объявлении — это реально круто.</p>
+  </div>`);
+  if (sub==='contacts'||sub==='all') div(`<div class="bubble">
+    <p>Жильё ищут в группах Facebook (<strong>Bali Monthly Villa & Apartment Rentals</strong> и других) и в русскоязычных Telegram-чатах. Многие советуют сначала взять жильё на короткий срок — осмотреться, убедиться, что нет стройки или петухов рядом, и потом снимать в долгосрок.</p>
+    <div class="place-card">
+      <div class="place-name">Rumi Bumi Lovina <span style="font-size:12px;color:#5f5e5a">(Ловина)</span></div>
+      <div style="font-size:13px;color:#5f5e5a;margin:.25rem 0">Тихий район. Добрая хозяйка, хороший интернет, 2 хороших варунга рядом.</div>
+      <a class="place-link" href="https://maps.app.goo.gl/GAFSfoR4eYP5MJzB9" target="_blank">Открыть на карте ↗</a>
+      <div style="font-size:13px;margin-top:.25rem">Контакт: <a href="tel:+6283147659233">+62 831 4765 9233</a></div>
+    </div>
+    <div class="place-card">
+      <div class="place-name">Astawa House <span style="font-size:12px;color:#5f5e5a">(Убуд)</span></div>
+      <div style="font-size:13px;color:#5f5e5a;margin:.25rem 0">Тихое место, нет петухов и стройки. 250 000 рупий/ночь (~1 200 ₽).</div>
+      <a class="place-link" href="https://maps.app.goo.gl/SsJqDh5A3Ba9AMUQ7" target="_blank">Открыть на карте ↗</a>
+      <div style="font-size:13px;margin-top:.25rem">Контакт: <a href="tel:+6281916267996">+62 819 1626 7996</a></div>
+    </div>
+    <div class="place-card">
+      <div class="place-name">Hermon House Ungasan <span style="font-size:12px;color:#5f5e5a">(Унгасан)</span></div>
+      <div style="font-size:13px;color:#5f5e5a;margin:.25rem 0">Идеальный хозяин Sigit. Базовые условия. 3 000 000 рупий/мес (~15 000 ₽).</div>
+      <a class="place-link" href="https://maps.app.goo.gl/3TNth1hXy7J5vP1z8" target="_blank">Открыть на карте ↗</a>
+      <div style="font-size:13px;margin-top:.25rem">Контакт: <a href="tel:+6282235354521">+62 822 3535 4521</a></div>
+    </div>
+  </div>`);
+}
+
+function renderTransport(sub) {
+  if (!sub) {
+    div(`<div class="bubble">
+      <div class="section-title">Что тебя интересует?</div>
+      <div class="btn-row" style="flex-direction:column;align-items:flex-start">
+        <button class="btn" onclick="state.extra={id:'transport',sub:'taxi'};render()">Байк-такси — если не водите байк самостоятельно</button>
+        <button class="btn" onclick="state.extra={id:'transport',sub:'rent'};render()">Самостоятельная аренда</button>
+        <button class="btn" onclick="state.extra={id:'transport',sub:'balimotion'};render()">Русские ренталы BaliMotion — проверенный контакт</button>
+        <button class="btn" onclick="state.extra={id:'transport',sub:'all'};render()">Обо всём сразу</button>
+      </div></div>`);
+    return;
+  }
+  const notice = `<div class="bubble"><p>На Буките нет тротуаров — ходить пешком практически невозможно. В Чангу и Убуде прогуляться уже реальнее, но тоже ограниченно.</p></div>`;
+  if (sub==='taxi'||sub==='all') div((sub==='all'?notice:'') + `<div class="bubble">
+    <p>Для коротких поездок — <strong>байк-такси</strong>, стоит копейки. С российским номером можно установить <strong>Grab</strong> (аналог Яндекс Go). Оплата наличкой или иностранной картой.</p>
+    <p><strong>Gojek</strong> — аналогичное приложение, но регистрируется только с местным номером.</p>
+  </div>`);
+  if (sub==='rent'||sub==='all') div(`<div class="bubble">
+    <p>Подавляющее большинство жителей Бали передвигаются на байке — и местные, и экспаты.</p>
+    <p>Я арендовала у <strong>BaliMotion</strong> на 2 недели — 1 408 000 рупий (~6 500 ₽), треть из которых — страховка. Страховка обязательна и реально работает: у меня сломалось зеркало и я упала — всё покрыли. Плюс доставляют байк куда нужно.</p>
+    <p>На короткий срок — BaliMotion оптимально. На долгий срок — выгоднее у местных.</p>
+    <p>Лайфхак: ставь телефон на подставку, надевай наушники с голосовым навигатором. В держатель на руле лучше не ставить — могут вырвать в движении.</p>
+  </div>`);
+  if (sub==='balimotion') div(`<div class="bubble">
+    <p>Рекомендую русские ренталы <strong>BaliMotion</strong>. 2 недели — ~6 500 ₽ (включая обязательную страховку). Доставляют байк куда нужно.</p>
+    <p>Страховка реально работает — мне покрыли сломанное зеркало и падение.</p>
+    <p>Для долгосрочной аренды выгоднее брать у местных.</p>
+  </div>`);
+}
+
+function moneyHTML() { return `<div class="bubble">
+  <p>Удобнее всего платить иностранной картой Visa или Mastercard. Если нет — подойдёт <strong>UnionPay от Россельхозбанка (РСХБ)</strong>.</p>
+  <p>Я получаю зарплату в рублях на Т-Банк, переводила на UnionPay РСХБ и снимала рупии в местных банкоматах. Не все банкоматы поддерживают UnionPay — в банкоматах <strong>BCA (Bank Central Asia)</strong> точно работает.</p>
+  <p>Конвертация через РСХБ не очень выгодная. Если едешь надолго — нужна иностранная карта или крипта (рубли → крипта → рупии). Для краткосрочной поездки схема с UnionPay РСХБ вполне рабочая.</p>
+</div>`; }
+
+function visaHTML() { return `<div class="bubble">
+  <p>Да, виза нужна. Самая популярная — <strong>электронная виза на 30 дней</strong>. Можно продлить один раз, затем нужно выехать из страны.</p>
+  <p>Есть также <strong>виза на 60 дней</strong> — живёшь 60 дней, продлеваешь ещё на 60 (не покидая Индонезию), затем выезжаешь.</p>
+  <p>Как оформить: прямо в аэропорту (принимают доллары, евро, рупии) или онлайн при наличии иностранной карты. Я оформила онлайн и не стояла в очереди.</p>
+</div>`; }
+
+function yogaHTML() { return `<div class="bubble">
+  <p>Йога-центры есть по всему Бали, но больше всего — в <strong>Убуде</strong>. Рекомендую <strong>The Yoga Barn</strong> — невероятные практики (многое зависит от преподавателя).</p>
+  <p>Я жила на Буките и ходила в <strong>Alchemy</strong>. Практики Water подходят и начинающим, и продолжающим. Все занятия — на английском. Одно посещение — около 800 ₽.</p>
+  <p>Также есть русскоязычные преподаватели — в частности, Аня (приостановила практики в январе 2026 года, но возможно возобновит и открыта к индивидуальным занятиям).</p>
+</div>`; }
+
+function beachesHTML() { return `<div class="bubble">
+  <p>Красивые пляжи — на <strong>Буките</strong>. Самые известные — <strong>Melasti</strong> и <strong>Pandawa</strong>. Большинство отдыхают в пляжных клубах — их там очень много.</p>
+  <p>Из локальных мест рекомендую <strong>Gunung Payung</strong> (популярен среди балийцев) и <strong>Balangan</strong> — там есть <strong>Jimmy Beach Cafe</strong>, где можно поработать или полюбоваться закатом.</p>
+  <p><strong>Dreamland</strong> — место для заката: за полчаса до него там собирается весь Букит, парковку надо искать заранее, но вид потрясающий.</p>
+  <p>Ещё очень советовали <strong>Nyang Nyang</strong> — я туда не успела, но отзывы отличные.</p>
+</div>`; }
+
+function natureHTML() { return `<div class="bubble">
+  <p>В первую очередь — <strong>вулканы</strong>.</p>
+  <p><strong>Вулкан Батур</strong> в районе Кинтамани — очень советую. Выходишь в 2 ночи, начинаешь восхождение в 3, с 5 до 7 утра любуешься видами. Это лучшие пейзажи, которые я видела в жизни. Безопасно, с проводником, подъём ~2,5 часа. Бронировала через MyBaliTrip.</p>
+  <p><strong>Вулкан Агунг</strong> — в три раза выше Батура, подъём ~7 часов. Без подготовки не рекомендую — после у неподготовленных летят колени.</p>
+  <p>Из нераскрученного — парк <strong>Tebing Nusa Dua</strong> на Буките. Можно медитировать, заниматься йогой или просто сидеть и смотреть на океан. Лучшая локация для фото.</p>
+</div>`; }
+
+function placeCard(name, note, url, contact) {
+  return `<div class="place-card">
+    <div class="place-name">${name}</div>
+    <div style="font-size:13px;color:#5f5e5a;margin:.25rem 0">${note}</div>
+    ${url ? `<a class="place-link" href="${url}" target="_blank">Открыть на карте ↗</a>` : ''}
+    ${contact ? `<div style="font-size:13px;margin-top:.25rem">Контакт: <a href="tel:${contact}">${contact}</a></div>` : ''}
+  </div>`;
+}
+
+const REMOTE_PLACES = {
+  'Улувату':[
+    {name:'Son of A Baker – Art & Bakehouse',note:'Тихое место. Подходит для работы без постоянных созвонов. Рекомендация: церемониальный какао.',url:'https://maps.app.goo.gl/bopjswqXhu5X1qaP9'},
+    {name:'Jimmy Beach Cafe',note:'Ресторан, кафе и кофейня на пляже Баланган. Можно поработать или полюбоваться закатом.',url:'https://maps.app.goo.gl/xTyN5yvwqoegjQHF9'},
+  ],
+  'Джимбаран':[
+    {name:'ANDES Coffee & Eatery',note:'Работала несколько раз. Вкусные завтраки, особенно авокадо-тост. Приветливый персонал.',url:'https://maps.app.goo.gl/7RXEhD4JRpKDAkUb9'},
+    {name:'KAPENI Coffee & Eatery',note:'Идеальный вид на закат. Открытая площадка на крыше.',url:'https://maps.app.goo.gl/QFcCRVncK6xkwrX99'},
+  ],
+  'Унгасан':[
+    {name:'Signa Cafe',note:'Одна из немногих кофеен, где реально комфортно работать. Программа лояльности. Сырники с карамелью — мастхэв.',url:'https://maps.app.goo.gl/6Rz2gPqtePqTREg57'},
+    {name:'AMINO – Healthy food and Desserts',note:'Здоровая еда, всё вкусно.',url:'https://maps.app.goo.gl/WAPQzQc795T7kftPA'},
+    {name:'SODA CAFE',note:'Вайбовая кофейня. Для работы подходит, если нет звонков — бывает громко.',url:'https://maps.app.goo.gl/6e1Zf5ZUTAoeRvzcA'},
+  ],
+  'Нуса Дуа':[
+    {name:'Rehat Cafe',note:'Локальная кофейня. Относительно нешумно, когда мало людей.',url:'https://maps.app.goo.gl/hhXiECovkkEFN5MY9'},
+  ],
+  'Семиньяк':[
+    {name:'Expat. Roasters Seminyak Petitenget',note:'Лучший кофе на Бали. Перед приготовлением выбираешь зерно — бариста поможет.',url:'https://maps.app.goo.gl/DP8RvFMvrf9HAYHv7'},
+  ],
+  'Чангу':[
+    {name:'SECRET SPOT CANGGU',note:'Довольно тихо, можно поработать. Рекомендация: боул с фалафелем.',url:'https://maps.app.goo.gl/Xc5DsQWe7Cbywtv96'},
+  ],
+  'Убуд':[
+    {name:'Clear Cafe',note:'Вкусно и тихо днём. Вечером к 20:00–21:00 становится многолюдно.',url:'https://maps.app.goo.gl/XECqwa2ho4Y5MRqN6'},
+  ],
+};
+
+const FOOD_PLACES = {
+  'Санур':[{name:'Sala Bistro',note:'Рекомендация: боул с фалафелем.',url:'https://maps.app.goo.gl/TYBmWLh11dYrYM8w6'}],
+  'Улувату':[
+    {name:'Son of A Baker – Art & Bakehouse',note:'Тихое место. Рекомендация: церемониальный какао.',url:'https://maps.app.goo.gl/bopjswqXhu5X1qaP9'},
+    {name:'JIMMY BEACH CAFE',note:'Ресторан на пляже Баланган. Закат и вкусная еда.',url:'https://maps.app.goo.gl/xTyN5yvwqoegjQHF9'},
+    {name:'NOURISH CAFE ULUWATU',note:'Вкусно всё, что брала. Есть также в Унгасане.',url:'https://maps.app.goo.gl/X6ftLx52D2PbMKb68'},
+  ],
+  'Джимбаран':[
+    {name:'ANDES Coffee & Eatery',note:'Вкусные завтраки. Рекомендация: авокадо-тост.',url:'https://maps.app.goo.gl/7RXEhD4JRpKDAkUb9'},
+    {name:'KAPENI Coffee & Eatery',note:'Идеальный вид на закат. Открытая площадка на крыше.',url:'https://maps.app.goo.gl/QFcCRVncK6xkwrX99'},
+  ],
+  'Унгасан':[
+    {name:'Signa Cafe',note:'Очень вкусные сырники с карамелью.',url:'https://maps.app.goo.gl/6Rz2gPqtePqTREg57'},
+    {name:'AMINO – Healthy food and Desserts',note:'Здоровая еда, всё вкусно.',url:'https://maps.app.goo.gl/WAPQzQc795T7kftPA'},
+    {name:'Ohana Bali Restaurant & Bar',note:'"Ohana" по-гавайски значит «семья».',url:'https://maps.app.goo.gl/SeUttYegwS9GfLGF6'},
+    {name:'NOURISH CAFE WHOLEFOODS PIZZERIA & BAKERY',note:'Вкусно всё, что брала. Есть также в Улувату.',url:'https://maps.app.goo.gl/ajn3XFNTAv4MakLz9'},
+    {name:'SODA CAFE',note:'Вайбовая кофейня.',url:'https://maps.app.goo.gl/6e1Zf5ZUTAoeRvzcA'},
+    {name:"Made's Bakery Cafe Playground",note:'Очень вкусные вафли. Шумно — у дороги.',url:'https://maps.app.goo.gl/QubFJ4eiQ8e6xgiZ8'},
+  ],
+  'Нуса Дуа':[
+    {name:'Rehat Cafe',note:'Локальная кофейня, относительно тихо.',url:'https://maps.app.goo.gl/hhXiECovkkEFN5MY9'},
+    {name:'The Kitchen',note:'Маленькое заведение, дружелюбный персонал. Рекомендация: Tuna-Avocado.',url:'https://maps.app.goo.gl/svLLU1zuU381NYNz9'},
+  ],
+  'Семиньяк':[
+    {name:'Expat. Roasters Seminyak Petitenget',note:'Лучший кофе на Бали. Выбираешь зерно перед приготовлением.',url:'https://maps.app.goo.gl/DP8RvFMvrf9HAYHv7'},
+    {name:'Coffee Cartel Seminyak',note:'Приятное кафе. Вкусная выпечка и кофе.',url:'https://maps.app.goo.gl/R4Ng2cFk8r44XoaFA'},
+  ],
+  'Чангу':[{name:'SECRET SPOT CANGGU',note:'Рекомендация: боул с фалафелем. Довольно тихо.',url:'https://maps.app.goo.gl/Xc5DsQWe7Cbywtv96'}],
+  'Убуд':[
+    {name:'Two Face / Coffee & Brunch',note:'Относительно дорого, но очень вкусно. Рекомендации: боул с фалафелем, паста с трюфелем.',url:'https://maps.app.goo.gl/9sdoewV6zd8mXTqi9'},
+    {name:'Clear Cafe',note:'Вкусно и тихо днём.',url:'https://maps.app.goo.gl/XECqwa2ho4Y5MRqN6'},
+    {name:'Blend Cafe Ubud',note:'Самые красочные и вкусные смузи-боулы из всех, что пробовала на Бали.',url:'https://maps.app.goo.gl/BAk73fZtstxWevUPA'},
+  ],
+  'Ловина':[
+    {name:'Buda Bakery & Resto',note:'Очень вкусный Gado-gado — традиционное индонезийское блюдо.',url:'https://maps.app.goo.gl/PKi6aTiNfW59dJKX6'},
+    {name:'Cafe Leo',note:'Одна из немногих туристических кофеен в Ловине. Вкусные завтраки.',url:'https://maps.app.goo.gl/aWZe7B2oA6HYBcnaA'},
+  ],
+};
+
+function renderRemote(area) {
+  div(`<div class="bubble"><p>Кафе не лучший вариант для работы, если много созвонов — очень громко. Лучше созваниваться из тихой комнаты в гесте. За 1,5 месяца я нашла всего одну по-настоящему тихую кофейню.</p></div>`);
+  if (!area) {
+    div(`<div class="bubble"><div class="section-title">Где планируете работать?</div><div class="btn-row">${REMOTE_AREAS.map(a=>`<button class="btn" onclick="state.extra={id:'remote',area:'${a}'};render()">${a}</button>`).join('')}</div></div>`);
+    return;
+  }
+  const places = REMOTE_PLACES[area] || [];
+  div(`<div class="bubble"><p style="font-weight:500">Кофейни в районе ${area}:</p>${places.map(p=>placeCard(p.name,p.note,p.url)).join('')}<button class="btn" style="margin-top:.75rem" onclick="state.extra={id:'remote'};render()">← Выбрать другой район</button></div>`);
+}
+
+function renderFood(area) {
+  if (!area) {
+    div(`<div class="bubble"><p>Как ни странно, на Бали вкусно почти везде. Выбери район, где хочешь поесть:</p><div class="btn-row" style="margin-top:.75rem">${FOOD_AREAS.map(a=>`<button class="btn" onclick="state.extra={id:'food',area:'${a}'};render()">${a}</button>`).join('')}</div></div>`);
+    return;
+  }
+  const places = FOOD_PLACES[area] || [];
+  div(`<div class="bubble"><p style="font-weight:500">Где поесть в районе ${area}:</p>${places.map(p=>placeCard(p.name,p.note,p.url)).join('')}<button class="btn" style="margin-top:.75rem" onclick="state.extra={id:'food'};render()">← Выбрать другой район</button></div>`);
+}
+
+window.go = go;
+window.render = render;
+render();
+</script>
+</body>
+</html>
